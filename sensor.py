@@ -121,7 +121,8 @@ class InkbirdUpdater(Entity):
         _LOGGER.debug(f"scanner here is {self.scanner}")
 
         # The btle on my raspberry pi 4 seems to go MIA
-        if self.no_results_counter >= 5:
+# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 2
+        if self.no_results_counter >= 2:
             _LOGGER.error("Btle went away .. restarting entire btle stack")
             self.scanner = Scanner()
             self.scanner.clear()
@@ -136,8 +137,9 @@ class InkbirdUpdater(Entity):
         results = self.scanner.getDevices()
         _LOGGER.debug(f"got results {results}")
         for dev in results:
-            self.handleDiscovery(dev)
-
+# MAC_hack to only calculate on these hard-coded MAC devices.
+            if dev.addr == "54:4a:16:5a:20:2e" or dev.addr == "49:42:06:00:15:3b":
+                self.handleDiscovery(dev)
         # if we have no results at all, the scanner may have gone MIA.
         # it happens apparently. So, let's count upto 5 and then, if it
         # still happens, restart/refresh the btle stack.
@@ -152,11 +154,12 @@ class InkbirdUpdater(Entity):
         return True
 
     def handleDiscovery(self, dev):
-        _LOGGER.debug(f"Discovered device {dev.addr}")
-        _LOGGER.debug("Device {} ({}), RSSI={} dB".format(dev.addr, dev.addrType, dev.rssi))
+#        _LOGGER.debug(f"Discovered device {dev.addr}")
+        _LOGGER.debug("Discovered device {} ({}), RSSI={} dB".format(dev.addr, dev.addrType, dev.rssi))
         for (adtype, desc, value) in dev.getScanData():
             _LOGGER.debug("[%s]  %s = %s" % (adtype, desc, value))
             if adtype == 255:
+                _LOGGER.debug(f"{dev.addr} matches a manually coded MAC and now gets parameters!")
                 humidity = "%2.2f" % (int(value[6:8]+value[4:6], 16)/100)
                 #temperature = "%2.2f" % (int(value[2:4]+value[:2], 16)/100)
                 temperature = int(value[2:4]+value[:2], 16)
@@ -168,7 +171,7 @@ class InkbirdUpdater(Entity):
                 _LOGGER.debug(self.inkbird_devices)
                 for device in self.inkbird_devices:
                     _LOGGER.debug(f" dev addr is {dev.addr} and mac is {device.mac}")
-                    _LOGGER.debug(f" --> {temperature} - {humidity} - {battery} ")
+#                    _LOGGER.debug(f" --> {temperature} - {humidity} - {battery} ")
                     if dev.addr == device.mac:
                         _LOGGER.debug(f" dev addr is {dev.addr} and mac is {device.mac} with parameter of {device.parameter}")
                         old_state = self.hass.states.get(f"sensor.{device.entity_name}")
@@ -176,7 +179,6 @@ class InkbirdUpdater(Entity):
                             attrs = old_state.attributes
                         else:
                             attrs = None
-
                         if device.parameter == "temperature":
                             _LOGGER.debug(f" >>>> updating device {device.mac} with {temperature}")
                             device.temperature = temperature
@@ -191,9 +193,8 @@ class InkbirdUpdater(Entity):
                             _LOGGER.debug(f" >>>> updating device {device.mac} with {battery}")
                             device.battery = battery
                             device._state = battery
-                            #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
-
-
+                                #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
+        _LOGGER.debug(f" Done with handleDiscovery")
 
 class InkbirdThermalSensor(Entity):
     """Representation of a Inkbird Sensor."""
