@@ -73,11 +73,11 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             entity_name = re.sub(' ', '_', name.lower())
 
             if parameter == "temperature":
-                inkbird_devices.append( InkbirdThermalSensor(device['mac'], uom, name, entity_name) )
+                inkbird_devices.append( InkbirdThermalSensor(device['mac'].lower(), uom, name, entity_name) )
             elif parameter == "humidity":
-                inkbird_devices.append( InkbirdHumiditySensor(device['mac'], uom, name, entity_name) )
+                inkbird_devices.append( InkbirdHumiditySensor(device['mac'].lower(), uom, name, entity_name) )
             else:
-                inkbird_devices.append( InkbirdBatterySensor(device['mac'], uom, name, entity_name) )
+                inkbird_devices.append( InkbirdBatterySensor(device['mac'].lower(), uom, name, entity_name) )
 # create list for MAC addresses
         devicemacs.append( device['mac'].lower() )
         _LOGGER.debug(f"Device MAC list is {devicemacs}")
