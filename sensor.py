@@ -7,7 +7,13 @@ import re
 from struct import unpack
 import signal
 import time
+# added os to kill bluepy-helper
+import os
+pid=os.getpid()
+# added list for MAC addresses
 
+devicemacs = []
+##
 from bluepy import btle
 from bluepy.btle import BTLEException, Scanner, DefaultDelegate
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -72,10 +78,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 inkbird_devices.append( InkbirdHumiditySensor(device['mac'], uom, name, entity_name) )
             else:
                 inkbird_devices.append( InkbirdBatterySensor(device['mac'], uom, name, entity_name) )
+# create list for MAC addresses
+        devicemacs.append( device['mac'].lower() )
+        _LOGGER.debug(f"Device MAC list is {devicemacs}")
 
     inkbird_devices.append( InkbirdUpdater(hass, inkbird_devices) )
     add_entities(inkbird_devices, True)
-
 
 class InkbirdUpdater(Entity):
 
@@ -91,7 +99,6 @@ class InkbirdUpdater(Entity):
         self.scanner = Scanner()
         self.scanner.clear()
         self.scanner.start()
-        self.no_results_counter = 0
         self.inkbird_devices = inkbird_devices
 
     @property
@@ -116,17 +123,12 @@ class InkbirdUpdater(Entity):
         return True
 
     def update(self):
+# added
+        global pid
+##
         """Get the latest data and use it to update our sensor state."""
         _LOGGER.debug("UPDATE called")
         _LOGGER.debug(f"scanner here is {self.scanner}")
-
-        # The btle on my raspberry pi 4 seems to go MIA
-        if self.no_results_counter >= 5:
-            _LOGGER.error("Btle went away .. restarting entire btle stack")
-            self.scanner = Scanner()
-            self.scanner.clear()
-            self.scanner.start()
-            self.no_results_counter = 0
 
         try:
             self.scanner.process(timeout=8.0)
@@ -135,28 +137,61 @@ class InkbirdUpdater(Entity):
             _LOGGER.error(f" Exception occoured during scanning: {e}")
         results = self.scanner.getDevices()
         _LOGGER.debug(f"got results {results}")
-        for dev in results:
-            self.handleDiscovery(dev)
 
+        # The btle on my raspberry pi 4 seems to go MIA
         # if we have no results at all, the scanner may have gone MIA.
         # it happens apparently. So, let's count upto 5 and then, if it
         # still happens, restart/refresh the btle stack.
-        # any results though will reset the btle 'MIA counter' to 0
+# Seems to go MIA more frequently on RPi3B: removed counter and restart immediately if no results obtained
+# May generate 10 s update timeout errors
         if not any(results):
-            self.no_results_counter += 1
-        else:
-            self.no_results_counter = 0
+            _LOGGER.error("Btle went away .. restarting entire btle stack")
+## Kill the bluepy-helper process
+# There is a memory leak: new instance of bluepy-helper is created with Scanner(), without terminating running instance
+# https://github.com/IanHarvey/bluepy/issues/267#issuecomment-657183840
+# adapted from: https://github.com/BlueMorph/Xiaomi_BLE_Tempertaure_Display_for_HA/blob/master/LYWSD03MMC.py
+            del self.scanner #probably not needed?
+            bluepypid=0
+            pstree=os.popen("pstree -p " + str(pid)).read() #we want to kill only bluepy from our own process tree, because other python scripts have there own bluepy-helper process
+            _LOGGER.debug("PSTree: " + pstree)
+            try:
+                bluepypid=re.findall(r'bluepy-helper\((.*)\)',pstree)[0] #Store the bluepypid, to kill it later
+            except IndexError: #Should not happen since we're now connected
+                _LOGGER.debug("Couldn't find pid of bluepy-helper")
+            if bluepypid is not 0:
+                os.system("kill " + bluepypid)
+                _LOGGER.debug("Killed bluepy with pid: " + str(bluepypid))
+# Kill bluepy-helper systemwide anyways...not good if there are other scripts using bluepy
+#            else:
+#                os.system('pkill bluepy-helper')
+#                _LOGGER.debug("Killed bluepy-helper")
+##
+            self.scanner = Scanner()
             self.scanner.clear()
+            self.scanner.start()
+            try:
+                self.scanner.process(timeout=8.0)
+            except:
+                e = sys.exc_info()[0]
+                _LOGGER.error(f" Exception occoured during scanning: {e}")
+            results = self.scanner.getDevices()
+            _LOGGER.debug(f"Got new results {results}")
 
+        for dev in results:
+            if dev.addr in devicemacs:
+                self.handleDiscovery(dev)
+
+        self.scanner.clear()
         self._state = []
         return True
 
     def handleDiscovery(self, dev):
-        _LOGGER.debug(f"Discovered device {dev.addr}")
-        _LOGGER.debug("Device {} ({}), RSSI={} dB".format(dev.addr, dev.addrType, dev.rssi))
+#        _LOGGER.debug(f"Discovered device {dev.addr}")
+        _LOGGER.debug("Discovered device {} ({}), RSSI={} dB".format(dev.addr, dev.addrType, dev.rssi))
         for (adtype, desc, value) in dev.getScanData():
             _LOGGER.debug("[%s]  %s = %s" % (adtype, desc, value))
             if adtype == 255:
+                _LOGGER.debug(f"{dev.addr} is in devicemacs list and now gets parameters!")
                 humidity = "%2.2f" % (int(value[6:8]+value[4:6], 16)/100)
                 #temperature = "%2.2f" % (int(value[2:4]+value[:2], 16)/100)
                 temperature = int(value[2:4]+value[:2], 16)
@@ -168,15 +203,15 @@ class InkbirdUpdater(Entity):
                 _LOGGER.debug(self.inkbird_devices)
                 for device in self.inkbird_devices:
                     _LOGGER.debug(f" dev addr is {dev.addr} and mac is {device.mac}")
-                    _LOGGER.debug(f" --> {temperature} - {humidity} - {battery} ")
+#                    _LOGGER.debug(f" --> {temperature} - {humidity} - {battery} ")
                     if dev.addr == device.mac:
                         _LOGGER.debug(f" dev addr is {dev.addr} and mac is {device.mac} with parameter of {device.parameter}")
-                        old_state = self.hass.states.get(f"sensor.{device.entity_name}")
-                        if old_state:
-                            attrs = old_state.attributes
-                        else:
-                            attrs = None
-
+# What does this do? Removed
+#                        old_state = self.hass.states.get(f"sensor.{device.entity_name}")
+#                        if old_state:
+#                            attrs = old_state.attributes
+#                        else:
+#                            attrs = None
                         if device.parameter == "temperature":
                             _LOGGER.debug(f" >>>> updating device {device.mac} with {temperature}")
                             device.temperature = temperature
@@ -192,9 +227,9 @@ class InkbirdUpdater(Entity):
                             device.battery = battery
                             device._state = battery
                             #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
+        _LOGGER.debug(f" Done with handleDiscovery")
 
-
-
+        
 class InkbirdThermalSensor(Entity):
     """Representation of a Inkbird Sensor."""
 
