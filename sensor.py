@@ -139,14 +139,14 @@ class InkbirdUpdater(Entity):
         # if we have no results at all, the scanner may have gone MIA.
         # it happens apparently. So, let's count upto 5 and then, if it
         # still happens, restart/refresh the btle stack.
-# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 2
+# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 0
         if not any(results):
             _LOGGER.error("Btle went away .. restarting entire btle stack")
 ## Kill the bluepy-helper process
+# There is a memory leak: new instance of bluepy-helper is created on Scanner(), without terminating running instances
 # https://github.com/IanHarvey/bluepy/issues/267#issuecomment-657183840
-            del self.scanner
-#
-#            pid=os.getpid()
+            del self.scanner #probably not needed
+# adapted from: https://github.com/BlueMorph/Xiaomi_BLE_Tempertaure_Display_for_HA/blob/master/LYWSD03MMC.py
             bluepypid=0
             pstree=os.popen("pstree -p " + str(pid)).read() #we want to kill only bluepy from our own process tree, because other python scripts have there own bluepy-helper process
             _LOGGER.debug("PSTree: " + pstree)
@@ -157,6 +157,7 @@ class InkbirdUpdater(Entity):
             if bluepypid is not 0:
                 os.system("kill " + bluepypid)
                 _LOGGER.debug("Killed bluepy with pid: " + str(bluepypid))
+# Kill bluepy-helper anyways for now...not good if there are other scripts using bluepy
             else:
                 os.system('pkill ' + process_name)
                 _LOGGER.debug("Killed bluepy-helper")
