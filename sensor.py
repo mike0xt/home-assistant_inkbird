@@ -11,6 +11,7 @@ import time
 import os
 pid=os.getpid()
 # added list for MAC addresses
+
 devicemacs = []
 ##
 from bluepy import btle
@@ -83,7 +84,6 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     inkbird_devices.append( InkbirdUpdater(hass, inkbird_devices) )
     add_entities(inkbird_devices, True)
-
 
 class InkbirdUpdater(Entity):
 
@@ -183,7 +183,6 @@ class InkbirdUpdater(Entity):
 
         self.scanner.clear()
         self._state = []
-
         return True
 
     def handleDiscovery(self, dev):
@@ -192,7 +191,7 @@ class InkbirdUpdater(Entity):
         for (adtype, desc, value) in dev.getScanData():
             _LOGGER.debug("[%s]  %s = %s" % (adtype, desc, value))
             if adtype == 255:
-                _LOGGER.debug(f"{dev.addr} matches a manually coded MAC and now gets parameters!")
+                _LOGGER.debug(f"{dev.addr} is in devicemacs list and now gets parameters!")
                 humidity = "%2.2f" % (int(value[6:8]+value[4:6], 16)/100)
                 #temperature = "%2.2f" % (int(value[2:4]+value[:2], 16)/100)
                 temperature = int(value[2:4]+value[:2], 16)
@@ -228,8 +227,10 @@ class InkbirdUpdater(Entity):
                             device.battery = battery
                             device._state = battery
                             #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
-#        _LOGGER.debug(f" Done with handleDiscovery")
-class InkbirdThermalSensor(Entity):
+        _LOGGER.debug(f" Done with handleDiscovery")
+
+        
+ class InkbirdThermalSensor(Entity):
     """Representation of a Inkbird Sensor."""
 
     def __init__(self, mac, uom, name, entity_name):
@@ -376,4 +377,3 @@ class InkbirdBatterySensor(Entity):
         return {
             STATE_ATTR_BATTERY: self.battery
         }
-    
