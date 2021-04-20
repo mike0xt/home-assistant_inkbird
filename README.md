@@ -77,6 +77,7 @@ Tested on a Raspberry Pi 3B running RaspberryPiOS with HA Container
 - Determination of sensor data only occurs on devices specified in configuration.yaml instead of all BT devices detected
 - Cleaned up and simplified debug logging
 - Removed waiting for next cycle for bluepy to return BTLE results. If no results are found, will restart the process and try again once for results. May result in HA warnings logged: "Update of inkbird.updater is taking over 10 seconds".
+- Updated the manifest.json to fix "No 'version' key in the manifest file" warning.
 
 ### Fixed
 - MAC addresses are now NOT case sensitive. May fix this error: https://community.home-assistant.io/t/inkbird-engbird-thermometer-and-hygrometer-sensor-need-help-trying-to-add-them-to-ha/94628/15
