@@ -10,6 +10,8 @@ import time
 # added os to kill bluepy-helper
 import os
 pid=os.getpid()
+# added list for MAC addresses
+devicemacs = []
 ##
 from bluepy import btle
 from bluepy.btle import BTLEException, Scanner, DefaultDelegate
@@ -75,6 +77,9 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 inkbird_devices.append( InkbirdHumiditySensor(device['mac'], uom, name, entity_name) )
             else:
                 inkbird_devices.append( InkbirdBatterySensor(device['mac'], uom, name, entity_name) )
+# create list for MAC addresses
+        devicemacs.append( device['mac'].lower() )
+        _LOGGER.debug(f"Device MAC list is {devicemacs}")
 
     inkbird_devices.append( InkbirdUpdater(hass, inkbird_devices) )
     add_entities(inkbird_devices, True)
@@ -94,7 +99,6 @@ class InkbirdUpdater(Entity):
         self.scanner = Scanner()
         self.scanner.clear()
         self.scanner.start()
-        self.no_results_counter = 0
         self.inkbird_devices = inkbird_devices
 
     @property
@@ -120,7 +124,6 @@ class InkbirdUpdater(Entity):
 
     def update(self):
 # added
-        process_name = 'bluepy-helper'
         global pid
 ##
         """Get the latest data and use it to update our sensor state."""
@@ -139,14 +142,15 @@ class InkbirdUpdater(Entity):
         # if we have no results at all, the scanner may have gone MIA.
         # it happens apparently. So, let's count upto 5 and then, if it
         # still happens, restart/refresh the btle stack.
-# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 0
+# Seems to go MIA more frequently on RPi3B: removed counter and restart immediately if no results obtained
+# May generate 10 s update timeout errors
         if not any(results):
             _LOGGER.error("Btle went away .. restarting entire btle stack")
 ## Kill the bluepy-helper process
-# There is a memory leak: new instance of bluepy-helper is created on Scanner(), without terminating running instances
+# There is a memory leak: new instance of bluepy-helper is created with Scanner(), without terminating running instance
 # https://github.com/IanHarvey/bluepy/issues/267#issuecomment-657183840
-            del self.scanner #probably not needed
 # adapted from: https://github.com/BlueMorph/Xiaomi_BLE_Tempertaure_Display_for_HA/blob/master/LYWSD03MMC.py
+            del self.scanner #probably not needed?
             bluepypid=0
             pstree=os.popen("pstree -p " + str(pid)).read() #we want to kill only bluepy from our own process tree, because other python scripts have there own bluepy-helper process
             _LOGGER.debug("PSTree: " + pstree)
@@ -157,10 +161,10 @@ class InkbirdUpdater(Entity):
             if bluepypid is not 0:
                 os.system("kill " + bluepypid)
                 _LOGGER.debug("Killed bluepy with pid: " + str(bluepypid))
-# Kill bluepy-helper anyways for now...not good if there are other scripts using bluepy
-            else:
-                os.system('pkill ' + process_name)
-                _LOGGER.debug("Killed bluepy-helper")
+# Kill bluepy-helper systemwide anyways...not good if there are other scripts using bluepy
+#            else:
+#                os.system('pkill bluepy-helper')
+#                _LOGGER.debug("Killed bluepy-helper")
 ##
             self.scanner = Scanner()
             self.scanner.clear()
@@ -174,8 +178,7 @@ class InkbirdUpdater(Entity):
             _LOGGER.debug(f"Got new results {results}")
 
         for dev in results:
-# MAC_hack to only calculate on these hard-coded MAC devices.
-            if dev.addr == "54:4a:16:5a:20:2e" or dev.addr == "49:42:06:00:15:3b":
+            if dev.addr in devicemacs:
                 self.handleDiscovery(dev)
 
         self.scanner.clear()
@@ -373,3 +376,4 @@ class InkbirdBatterySensor(Entity):
         return {
             STATE_ATTR_BATTERY: self.battery
         }
+    
