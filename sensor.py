@@ -230,7 +230,7 @@ class InkbirdUpdater(Entity):
         _LOGGER.debug(f" Done with handleDiscovery")
 
         
- class InkbirdThermalSensor(Entity):
+class InkbirdThermalSensor(Entity):
     """Representation of a Inkbird Sensor."""
 
     def __init__(self, mac, uom, name, entity_name):
