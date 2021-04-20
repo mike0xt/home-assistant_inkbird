@@ -7,7 +7,10 @@ import re
 from struct import unpack
 import signal
 import time
-
+# added os to kill bluepy-helper
+import os
+pid=os.getpid()
+##
 from bluepy import btle
 from bluepy.btle import BTLEException, Scanner, DefaultDelegate
 from homeassistant.components.sensor import PLATFORM_SCHEMA
@@ -116,18 +119,13 @@ class InkbirdUpdater(Entity):
         return True
 
     def update(self):
+# added
+        process_name = 'bluepy-helper'
+        global pid
+##
         """Get the latest data and use it to update our sensor state."""
         _LOGGER.debug("UPDATE called")
         _LOGGER.debug(f"scanner here is {self.scanner}")
-
-        # The btle on my raspberry pi 4 seems to go MIA
-# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 2
-        if self.no_results_counter >= 2:
-            _LOGGER.error("Btle went away .. restarting entire btle stack")
-            self.scanner = Scanner()
-            self.scanner.clear()
-            self.scanner.start()
-            self.no_results_counter = 0
 
         try:
             self.scanner.process(timeout=8.0)
@@ -136,21 +134,52 @@ class InkbirdUpdater(Entity):
             _LOGGER.error(f" Exception occoured during scanning: {e}")
         results = self.scanner.getDevices()
         _LOGGER.debug(f"got results {results}")
+
+        # The btle on my raspberry pi 4 seems to go MIA
+        # if we have no results at all, the scanner may have gone MIA.
+        # it happens apparently. So, let's count upto 5 and then, if it
+        # still happens, restart/refresh the btle stack.
+# Seems to go MIA more frequently than no with RPi3: changed counter from 5 to 2
+        if not any(results):
+            _LOGGER.error("Btle went away .. restarting entire btle stack")
+## Kill the bluepy-helper process
+# https://github.com/IanHarvey/bluepy/issues/267#issuecomment-657183840
+            del self.scanner
+#
+#            pid=os.getpid()
+            bluepypid=0
+            pstree=os.popen("pstree -p " + str(pid)).read() #we want to kill only bluepy from our own process tree, because other python scripts have there own bluepy-helper process
+            _LOGGER.debug("PSTree: " + pstree)
+            try:
+                bluepypid=re.findall(r'bluepy-helper\((.*)\)',pstree)[0] #Store the bluepypid, to kill it later
+            except IndexError: #Should not happen since we're now connected
+                _LOGGER.debug("Couldn't find pid of bluepy-helper")
+            if bluepypid is not 0:
+                os.system("kill " + bluepypid)
+                _LOGGER.debug("Killed bluepy with pid: " + str(bluepypid))
+            else:
+                os.system('pkill ' + process_name)
+                _LOGGER.debug("Killed bluepy-helper")
+##
+            self.scanner = Scanner()
+            self.scanner.clear()
+            self.scanner.start()
+            try:
+                self.scanner.process(timeout=8.0)
+            except:
+                e = sys.exc_info()[0]
+                _LOGGER.error(f" Exception occoured during scanning: {e}")
+            results = self.scanner.getDevices()
+            _LOGGER.debug(f"Got new results {results}")
+
         for dev in results:
 # MAC_hack to only calculate on these hard-coded MAC devices.
             if dev.addr == "54:4a:16:5a:20:2e" or dev.addr == "49:42:06:00:15:3b":
                 self.handleDiscovery(dev)
-        # if we have no results at all, the scanner may have gone MIA.
-        # it happens apparently. So, let's count upto 5 and then, if it
-        # still happens, restart/refresh the btle stack.
-        # any results though will reset the btle 'MIA counter' to 0
-        if not any(results):
-            self.no_results_counter += 1
-        else:
-            self.no_results_counter = 0
-            self.scanner.clear()
 
+        self.scanner.clear()
         self._state = []
+
         return True
 
     def handleDiscovery(self, dev):
@@ -174,11 +203,12 @@ class InkbirdUpdater(Entity):
 #                    _LOGGER.debug(f" --> {temperature} - {humidity} - {battery} ")
                     if dev.addr == device.mac:
                         _LOGGER.debug(f" dev addr is {dev.addr} and mac is {device.mac} with parameter of {device.parameter}")
-                        old_state = self.hass.states.get(f"sensor.{device.entity_name}")
-                        if old_state:
-                            attrs = old_state.attributes
-                        else:
-                            attrs = None
+# What does this do? Removed
+#                        old_state = self.hass.states.get(f"sensor.{device.entity_name}")
+#                        if old_state:
+#                            attrs = old_state.attributes
+#                        else:
+#                            attrs = None
                         if device.parameter == "temperature":
                             _LOGGER.debug(f" >>>> updating device {device.mac} with {temperature}")
                             device.temperature = temperature
@@ -193,9 +223,8 @@ class InkbirdUpdater(Entity):
                             _LOGGER.debug(f" >>>> updating device {device.mac} with {battery}")
                             device.battery = battery
                             device._state = battery
-                                #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
-        _LOGGER.debug(f" Done with handleDiscovery")
-
+                            #self.hass.states.set(f"sensor.{device.entity_name}", battery, attrs)
+#        _LOGGER.debug(f" Done with handleDiscovery")
 class InkbirdThermalSensor(Entity):
     """Representation of a Inkbird Sensor."""
 
