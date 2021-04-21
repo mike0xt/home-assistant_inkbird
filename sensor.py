@@ -149,7 +149,7 @@ class InkbirdUpdater(Entity):
 ## Kill the bluepy-helper process
 # There is a memory leak: new instance of bluepy-helper is created with Scanner(), without terminating running instance
 # https://github.com/IanHarvey/bluepy/issues/267#issuecomment-657183840
-# adapted from: https://github.com/BlueMorph/Xiaomi_BLE_Tempertaure_Display_for_HA/blob/master/LYWSD03MMC.py
+# adapted from: https://github.com/JsBergbau/MiTemperature2/blob/master/LYWSD03MMC.py
             del self.scanner #probably not needed?
             bluepypid=0
             pstree=os.popen("pstree -p " + str(pid)).read() #we want to kill only bluepy from our own process tree, because other python scripts have there own bluepy-helper process
