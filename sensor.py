@@ -259,6 +259,11 @@ class InkbirdThermalSensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
+    
+    @property
+    def unique_id(self):
+        """Return the unique_id of the sensor."""
+        return self._mac+'t'
 
     @property
     def state(self):
@@ -312,6 +317,11 @@ class InkbirdHumiditySensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
+    
+    @property
+    def unique_id(self):
+        """Return the unique_id of the sensor."""
+        return self._mac+'h'
 
     @property
     def state(self):
@@ -360,6 +370,11 @@ class InkbirdBatterySensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
+    
+    @property
+    def unique_id(self):
+        """Return the unique_id of the sensor."""
+        return self._mac+'b'
 
     @property
     def state(self):
