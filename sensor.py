@@ -241,6 +241,7 @@ class InkbirdThermalSensor(Entity):
         self._unit_of_measurement = uom
         self._name = name
         self._entity_name = entity_name
+        self._unique_id = 't_' + self._mac
         self.parameter = "temperature"
         self._state = None
         self.temperature = None
@@ -259,11 +260,16 @@ class InkbirdThermalSensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
-    
+
     @property
     def unique_id(self):
         """Return the unique_id of the sensor."""
-        return self._mac+'t'
+        return self._unique_id
+
+    @property
+    def device_class(self):
+        """Return the device class."""
+        return self._device_class
 
     @property
     def state(self):
@@ -299,6 +305,7 @@ class InkbirdHumiditySensor(Entity):
         self._unit_of_measurement = uom
         self._name = name
         self._entity_name = entity_name
+        self._unique_id = 'h_' + self._mac
         self.parameter = "humidity"
         self._state = None
         self.humidity = None
@@ -317,11 +324,17 @@ class InkbirdHumiditySensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
-    
+
     @property
     def unique_id(self):
         """Return the unique_id of the sensor."""
-        return self._mac+'h'
+        return self._unique_id
+
+    @property
+    def device_class(self):
+        """Return the device class."""
+        return self._device_class
+
 
     @property
     def state(self):
@@ -352,6 +365,7 @@ class InkbirdBatterySensor(Entity):
         self._unit_of_measurement = uom
         self._name = name
         self._entity_name = entity_name
+        self._unique_id = 'b_' + self._mac
         self.parameter = "battery"
         self._state = None
         self.battery = None
@@ -370,13 +384,18 @@ class InkbirdBatterySensor(Entity):
     def entity_name(self):
         """Return the entity name of the sensor."""
         return self._entity_name
-    
+
     @property
     def unique_id(self):
         """Return the unique_id of the sensor."""
-        return self._mac+'b'
+        return self._unique_id
 
     @property
+    def device_class(self):
+        """Return the device class."""
+        return self._device_class
+    @property
+
     def state(self):
         """Return the state of the sensor."""
         return self._state
