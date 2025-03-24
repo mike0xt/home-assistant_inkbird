@@ -27,7 +27,7 @@ docker exec -it homeassistant bash
 pip install --find-links $WHEELS_LINKS bluepy==1.3.0
 # From <https://github.com/home-assistant/core/issues/24441> 
 # lib cap and setcap may not be needed??
-apk add labcap
+apk add libcap
 setcap 'cap_net_raw,cap_net_admin+eip' /usr/local/lib/python3.8/site-packages/bluepy/bluepy-helper
 ```
 ## Configuration
